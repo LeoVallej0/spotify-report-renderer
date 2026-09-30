@@ -15,7 +15,7 @@
   },
   "jobs": {
     "renderer-test": {
-      "name": "Chromium headless 50-row test",
+      "name": "Chromium render + Apps Script callback",
       "runs-on": "ubuntu-latest",
       "timeout-minutes": 15,
       "steps": [
@@ -62,6 +62,14 @@
             "if-no-files-found": "error",
             "retention-days": 7
           }
+        },
+        {
+          "name": "Send PNG to Apps Script",
+          "env": {
+            "CALLBACK_SECRET": "${{ secrets.RENDER_CALLBACK_SECRET }}"
+          },
+          "run": "python - <<'PY4'\nimport base64\nimport json\nimport os\nimport urllib.parse\nimport urllib.request\nfrom pathlib import Path\n\npayload = json.loads(Path('payload.json').read_text(encoding='utf-8'))\nout = Path('artifacts/real_render_test')\nimage_path = out / 'report_real.png'\n\ncallback_url = str(payload.get('callbackUrl', '')).strip()\nsecret = os.environ.get('CALLBACK_SECRET', '').strip()\n\nif not callback_url:\n    raise SystemExit('Missing payload.callbackUrl')\nif not secret:\n    raise SystemExit('Missing GitHub secret RENDER_CALLBACK_SECRET')\nif not image_path.exists():\n    raise SystemExit('Missing report_real.png')\n\n# Apps Script web apps expose doPost(e). We send the image as base64 JSON.\n# The PNG is already validated before this step.\nimage_b64 = base64.b64encode(image_path.read_bytes()).decode('ascii')\n\nwith (out / 'history_real.csv').open(encoding='utf-8', newline='') as f:\n    import csv\n    rows = list(csv.DictReader(f))\n\nofficial_count = sum(1 for r in rows if r.get('origen') == 'playlist_x')\nrandom_count = sum(1 for r in rows if r.get('origen') == 'random')\n\nreport_payload = {\n    'type': 'report_result',\n    'recordId': payload.get('recordId', ''),\n    'playlistName': payload.get('playlistName', 'Playlist'),\n    'referenceTime': payload.get('referenceTime', ''),\n    'generatedAt': payload.get('generatedAt', ''),\n    'officialCount': official_count,\n    'randomCount': random_count,\n    'totalRows': len(rows),\n    'imageFileName': image_path.name,\n    'imageBase64': image_b64,\n}\n\nseparator = '&' if '?' in callback_url else '?'\nurl = callback_url + separator + urllib.parse.urlencode({'key': secret})\n\nbody = json.dumps(report_payload).encode('utf-8')\nreq = urllib.request.Request(\n    url,\n    data=body,\n    headers={\n        'Content-Type': 'application/json',\n        'Accept': 'application/json',\n        'User-Agent': 'GitHubActions-SpotifyReportRenderer/1.0',\n    },\n    method='POST',\n)\n\ntry:\n    with urllib.request.urlopen(req, timeout=120) as response:\n        status = response.status\n        response_body = response.read().decode('utf-8', errors='replace')\nexcept Exception as exc:\n    raise SystemExit(f'Callback request failed: {exc}')\n\nprint('Apps Script callback HTTP:', status)\nprint('Apps Script callback response:', response_body[:2000])\n\nif status < 200 or status >= 300:\n    raise SystemExit(f'Apps Script callback returned HTTP {status}')\n\nresult = json.loads(response_body)\nif result.get('ok') is not True:\n    raise SystemExit(f'Apps Script callback reported failure: {result}')\n\nprint('CALLBACK OK')\nprint('Saved relative image path:', result.get('fileName', ''))\nprint('Drive file id:', result.get('fileId', ''))\nPY4",
+          "if": "${{ github.event_name == 'repository_dispatch' && github.event.action == 'render_real_test' }}"
         }
       ]
     }
