@@ -16,10 +16,11 @@ from PIL import Image
 from playwright.sync_api import sync_playwright
 
 TARGET_ROWS = 50
-VIEWPORT_WIDTH = 1500
+VIEWPORT_WIDTH = 1445
 VIEWPORT_HEIGHT = 2047
-OUTPUT_WIDTH = 1445
-OUTPUT_HEIGHT = 2047
+DEVICE_SCALE_FACTOR = 2
+OUTPUT_WIDTH = 2890
+CROP_HEIGHT_PX = 3090
 
 
 def parse_dt(value: str) -> datetime:
@@ -230,15 +231,24 @@ def render_chromium(html: str, png_path: Path) -> dict[str, Any]:
     raw_path = png_path.with_name(png_path.stem + '_raw.png')
 
     with sync_playwright() as playwright:
-        executable = os.environ.get('CHROMIUM_EXECUTABLE') or shutil.which('chromium') or shutil.which('google-chrome')
+        executable = (
+            os.environ.get('CHROMIUM_EXECUTABLE')
+            or shutil.which('chromium')
+            or shutil.which('google-chrome')
+        )
         launch_kwargs = {
             'headless': True,
-            'args': ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+            'args': [
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+            ],
         }
         if executable:
             launch_kwargs['executable_path'] = executable
         else:
             launch_kwargs['channel'] = 'chromium'
+
         browser = playwright.chromium.launch(**launch_kwargs)
         try:
             page = browser.new_page(
@@ -246,28 +256,51 @@ def render_chromium(html: str, png_path: Path) -> dict[str, Any]:
                     'width': VIEWPORT_WIDTH,
                     'height': VIEWPORT_HEIGHT,
                 },
-                device_scale_factor=1,
+                device_scale_factor=DEVICE_SCALE_FACTOR,
             )
             page.set_content(html, wait_until='load', timeout=30000)
             page.wait_for_timeout(250)
-            page.screenshot(
+
+            # Capture ONLY the report area. This avoids the viewport's unused
+            # bottom space and gives us a stable physical image size at DPR=2.
+            capture = page.locator('[data-capture-area="true"]').first
+            if capture.count() != 1:
+                raise RuntimeError(
+                    'Expected exactly one [data-capture-area="true"] element.'
+                )
+
+            capture.screenshot(
                 path=str(raw_path),
-                full_page=False,
+                scale='device',
             )
         finally:
             browser.close()
 
-    # Match the user's current stored PNG dimensions while preserving the
-    # browser's layout characteristics.
     image = Image.open(raw_path).convert('RGB')
-    image = image.resize((OUTPUT_WIDTH, OUTPUT_HEIGHT), Image.Resampling.LANCZOS)
-    image.save(png_path, format='PNG', optimize=True)
+
+    if image.width != OUTPUT_WIDTH:
+        raise RuntimeError(
+            f'Unexpected high-resolution width: {image.width}; expected {OUTPUT_WIDTH}'
+        )
+
+    if image.height < CROP_HEIGHT_PX:
+        raise RuntimeError(
+            f'Captured report is only {image.height}px tall; crop requires {CROP_HEIGHT_PX}px.'
+        )
+
+    # Fixed crop, never resampling the report. The crop is based on the current
+    # validated 50-row template: content ends around y=3052px, leaving a small
+    # clean bottom margin before the final cut at y=3090px.
+    cropped = image.crop((0, 0, OUTPUT_WIDTH, CROP_HEIGHT_PX))
+    cropped.save(png_path, format='PNG', optimize=True)
 
     return {
-        'raw_width': image.width if False else VIEWPORT_WIDTH,
-        'raw_height': VIEWPORT_HEIGHT,
-        'width': OUTPUT_WIDTH,
-        'height': OUTPUT_HEIGHT,
+        'raw_width': image.width,
+        'raw_height': image.height,
+        'width': cropped.width,
+        'height': cropped.height,
+        'device_scale_factor': DEVICE_SCALE_FACTOR,
+        'crop_bottom_px': CROP_HEIGHT_PX,
         'png_bytes': png_path.stat().st_size,
         'raw_png_bytes': raw_path.stat().st_size,
     }
@@ -374,7 +407,14 @@ def main() -> None:
         'randomRowsUsed': validation['random_rows'],
         'outputRows': len(rows),
         'viewport': [VIEWPORT_WIDTH, VIEWPORT_HEIGHT],
-        'outputSize': [OUTPUT_WIDTH, OUTPUT_HEIGHT],
+        'deviceScaleFactor': DEVICE_SCALE_FACTOR,
+        'outputSize': [OUTPUT_WIDTH, CROP_HEIGHT_PX],
+        'crop': {
+            'x': 0,
+            'y': 0,
+            'width': OUTPUT_WIDTH,
+            'height': CROP_HEIGHT_PX,
+        },
         'render': render_result,
         'validation': validation,
     }
