@@ -1,1 +1,65 @@
+name: Render Spotify Reports
 
+on:
+  repository_dispatch:
+    types: [render_scheduled, render_manual_test]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spotify-report-renderer
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Linux dependencies for WeasyPrint
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libpango-1.0-0 \
+            libpangoft2-1.0-0 \
+            libpangocairo-1.0-0 \
+            libcairo2 \
+            libffi-dev \
+            shared-mime-info
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && pip install -r renderer/requirements.txt
+
+      - name: Prepare payload
+        env:
+          PAYLOAD_JSON: ${{ toJson(github.event.client_payload) }}
+        run: |
+          python - <<'PY'
+          import json, os
+          payload = os.environ.get('PAYLOAD_JSON', '').strip()
+          if not payload:
+              payload = json.dumps({
+                  "jobs": [],
+                  "randomPlaylistUrl": "",
+                  "callbackUrl": "",
+              })
+          with open('payload.json', 'w', encoding='utf-8') as f:
+              f.write(payload)
+          print('Payload bytes:', len(payload.encode('utf-8')))
+          PY
+
+      - name: Render reports
+        env:
+          RENDER_CALLBACK_SECRET: ${{ secrets.RENDER_CALLBACK_SECRET }}
+        run: python renderer/renderer_live.py payload.json
