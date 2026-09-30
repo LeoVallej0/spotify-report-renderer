@@ -20,8 +20,7 @@
           "name": "Setup Python 3.13",
           "uses": "actions/setup-python@v7",
           "with": {
-            "python-version": "3.13",
-            "cache": "pip"
+            "python-version": "3.13"
           }
         },
         {
@@ -30,11 +29,11 @@
         },
         {
           "name": "Install Python packages",
-          "run": "python -m pip install --upgrade pip\npython -m pip install weasyprint==70.0 pymupdf==1.28.2"
+          "run": "python -m pip install --upgrade pip\npython -m pip install weasyprint==70.0 pymupdf==1.28.2 pillow"
         },
         {
           "name": "Verify renderer libraries",
-          "run": "python -c \"import weasyprint, fitz; print('WeasyPrint:', weasyprint.__version__); print('PyMuPDF:', fitz.VersionBind)\""
+          "run": "python -c \"import weasyprint, fitz, PIL; print('WeasyPrint:', weasyprint.__version__); print('PyMuPDF:', fitz.VersionBind); print('Pillow:', PIL.__version__)\""
         },
         {
           "name": "Check renderer files",
