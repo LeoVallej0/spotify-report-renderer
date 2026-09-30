@@ -1,11 +1,12 @@
 name: Render Spotify Reports
 
-on: workflow_dispatch
+'on':
+  workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: GitHub Actions test
-        run: echo "GitHub Actions funciona correctamente"
+      - name: Test
+        run: echo "FUNCIONA"
