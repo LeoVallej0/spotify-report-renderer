@@ -39,9 +39,19 @@ jobs:
             shared-mime-info
 
       - name: Install Python dependencies
-        run: python -m pip install --upgrade pip && pip install -r renderer/requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r renderer/requirements.txt
 
-      - name: Prepare payload
+      # Ejecución manual: prueba únicamente el motor HTML -> PDF -> PNG.
+      # No necesita payload, Spotify, Apps Script ni callback.
+      - name: Smoke test renderer
+        if: github.event_name == 'workflow_dispatch'
+        run: python renderer/smoke_test.py
+
+      # Ejecución real: Apps Script dispara repository_dispatch con jobs.
+      - name: Prepare production payload
+        if: github.event_name == 'repository_dispatch'
         env:
           PAYLOAD_JSON: ${{ toJson(github.event.client_payload) }}
         run: |
@@ -49,17 +59,14 @@ jobs:
           import json, os
           payload = os.environ.get('PAYLOAD_JSON', '').strip()
           if not payload:
-              payload = json.dumps({
-                  "jobs": [],
-                  "randomPlaylistUrl": "",
-                  "callbackUrl": "",
-              })
+              raise SystemExit('No se recibió client_payload en repository_dispatch.')
           with open('payload.json', 'w', encoding='utf-8') as f:
               f.write(payload)
           print('Payload bytes:', len(payload.encode('utf-8')))
           PY
 
-      - name: Render reports
+      - name: Render production reports
+        if: github.event_name == 'repository_dispatch'
         env:
           RENDER_CALLBACK_SECRET: ${{ secrets.RENDER_CALLBACK_SECRET }}
         run: python renderer/renderer_live.py payload.json
