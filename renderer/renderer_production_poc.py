@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from html import escape
 from pathlib import Path
 
-import fitz
+import pymupdf as fitz
 from weasyprint import HTML
 
 TARGET_ROWS = 50
@@ -184,7 +184,7 @@ def main():
     args = ap.parse_args()
 
     out = Path(args.outdir)
-    out.mkdir(exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     template = load_template(args.template)
     x = synthetic_playlist(30)
     pool = synthetic_random_pool(5000)
