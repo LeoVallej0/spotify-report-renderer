@@ -1,12 +1,17 @@
-name: Render Spotify Reports
-
-'on':
-  workflow_dispatch:
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Test
-        run: echo "FUNCIONA"
+{
+  "name": "Render Spotify Reports",
+  "on": {
+    "workflow_dispatch": {}
+  },
+  "jobs": {
+    "test": {
+      "runs-on": "ubuntu-latest",
+      "steps": [
+        {
+          "name": "GitHub Actions test",
+          "run": "echo \"FUNCIONA CORRECTAMENTE\""
+        }
+      ]
+    }
+  }
+}
