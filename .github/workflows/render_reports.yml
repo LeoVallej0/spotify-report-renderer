@@ -49,20 +49,14 @@ jobs:
       - name: Smoke test
         run: python renderer/smoke_test.py
 
-      - name: Show repository dispatch payload
+      - name: Show repository dispatch payload (when present)
         if: ${{ github.event_name == 'repository_dispatch' }}
         env:
           PAYLOAD_JSON: ${{ toJson(github.event.client_payload) }}
         run: |
           python - <<'PY'
           import os
-
           payload = os.environ.get('PAYLOAD_JSON', '')
-
-          print(
-              'repository_dispatch payload bytes:',
-              len(payload.encode('utf-8'))
-          )
-
+          print('repository_dispatch payload bytes:', len(payload.encode('utf-8')))
           print(payload[:4000])
           PY
