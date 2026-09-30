@@ -1,0 +1,35 @@
+{
+  "renderer": "chromium-headless",
+  "type": "real_render_test",
+  "recordId": "FIXTURE_30_20",
+  "playlistName": "Chromium renderer test",
+  "referenceTime": "2026-09-30T12:00:00",
+  "playlistXInputRows": 30,
+  "officialRowsUsed": 30,
+  "randomRowsUsed": 20,
+  "outputRows": 50,
+  "viewport": [
+    1500,
+    2047
+  ],
+  "outputSize": [
+    1445,
+    2047
+  ],
+  "render": {
+    "raw_width": 1500,
+    "raw_height": 2047,
+    "width": 1445,
+    "height": 2047,
+    "png_bytes": 383255,
+    "raw_png_bytes": 270541
+  },
+  "validation": {
+    "rows": 50,
+    "playlist_x_rows": 30,
+    "random_rows": 20,
+    "random_gap_min_s": 17,
+    "random_gap_max_s": 1593,
+    "random_gap_over_120_count": 12
+  }
+}

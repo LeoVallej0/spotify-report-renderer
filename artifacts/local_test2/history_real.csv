@@ -1,0 +1,51 @@
+orden_salida,origen,track,artist,duration_ms,played_at,gap_s
+1,playlist_x,Official Track 29,Artist Beta,232309,2026-09-30T12:00:00,0
+2,playlist_x,Official Track 28,Artist Delta,214988,2026-09-30T11:56:07.691000,0
+3,playlist_x,Official Track 27,Artist Alpha,197667,2026-09-30T11:52:32.703000,0
+4,playlist_x,Official Track 26,Artist Gamma,180346,2026-09-30T11:49:15.036000,0
+5,playlist_x,Official Track 25,Artist Beta,313025,2026-09-30T11:46:14.690000,0
+6,playlist_x,Official Track 24,Artist Alpha,295704,2026-09-30T11:41:01.665000,0
+7,playlist_x,Official Track 23,Artist Zeta,278383,2026-09-30T11:36:05.961000,0
+8,playlist_x,Official Track 22,Artist Epsilon,261062,2026-09-30T11:31:27.578000,0
+9,playlist_x,Official Track 21,Artist Beta,243741,2026-09-30T11:27:06.516000,0
+10,playlist_x,Official Track 20,Artist Delta,226420,2026-09-30T11:23:02.775000,0
+11,playlist_x,Official Track 19,Artist Alpha,209099,2026-09-30T11:19:16.355000,0
+12,playlist_x,Official Track 18,Artist Gamma,191778,2026-09-30T11:15:47.256000,0
+13,playlist_x,Official Track 17,Artist Beta,324457,2026-09-30T11:12:35.478000,0
+14,playlist_x,Official Track 16,Artist Alpha,307136,2026-09-30T11:07:11.021000,0
+15,playlist_x,Official Track 15,Artist Zeta,289815,2026-09-30T11:02:03.885000,0
+16,playlist_x,Official Track 14,Artist Epsilon,272494,2026-09-30T10:57:14.070000,0
+17,playlist_x,Official Track 13,Artist Beta,255173,2026-09-30T10:52:41.576000,0
+18,playlist_x,Official Track 12,Artist Delta,237852,2026-09-30T10:48:26.403000,0
+19,playlist_x,Official Track 11,Artist Alpha,220531,2026-09-30T10:44:28.551000,0
+20,playlist_x,Official Track 10,Artist Gamma,203210,2026-09-30T10:40:48.020000,0
+21,playlist_x,Official Track 09,Artist Beta,185889,2026-09-30T10:37:24.810000,0
+22,playlist_x,Official Track 08,Artist Alpha,318568,2026-09-30T10:34:18.921000,0
+23,playlist_x,Official Track 07,Artist Zeta,301247,2026-09-30T10:29:00.353000,0
+24,playlist_x,Official Track 06,Artist Epsilon,283926,2026-09-30T10:23:59.106000,0
+25,playlist_x,Official Track 05,Artist Beta,266605,2026-09-30T10:19:15.180000,0
+26,playlist_x,Official Track 04,Artist Delta,249284,2026-09-30T10:14:48.575000,0
+27,playlist_x,Official Track 03,Artist Alpha,231963,2026-09-30T10:10:39.291000,0
+28,playlist_x,Official Track 02,Artist Gamma,214642,2026-09-30T10:06:47.328000,0
+29,playlist_x,Official Track 01,Artist Beta,197321,2026-09-30T10:03:12.686000,0
+30,playlist_x,Official Track 00,Artist Alpha,180000,2026-09-30T09:59:55.365000,0
+31,random,Random Pool Track 1445,Pool Artist 245,58345,2026-09-30T09:56:38.365000,17
+32,random,Random Pool Track 1863,Pool Artist 063,68323,2026-09-30T09:51:44.020000,236
+33,random,Random Pool Track 1963,Pool Artist 163,130423,2026-09-30T09:37:17.697000,798
+34,random,Random Pool Track 1283,Pool Artist 083,124143,2026-09-30T09:30:22.274000,285
+35,random,Random Pool Track 0986,Pool Artist 086,158106,2026-09-30T09:26:56.131000,82
+36,random,Random Pool Track 0323,Pool Artist 023,99983,2026-09-30T08:57:47.025000,1591
+37,random,Random Pool Track 1856,Pool Artist 056,74376,2026-09-30T08:54:17.042000,110
+38,random,Random Pool Track 0842,Pool Artist 242,245482,2026-09-30T08:45:47.666000,435
+39,random,Random Pool Track 0062,Pool Artist 062,177102,2026-09-30T08:40:10.184000,92
+40,random,Random Pool Track 1067,Pool Artist 167,125207,2026-09-30T08:33:05.082000,248
+41,random,Random Pool Track 0740,Pool Artist 140,296540,2026-09-30T08:28:08.875000,171
+42,random,Random Pool Track 0964,Pool Artist 064,102844,2026-09-30T08:21:50.335000,82
+43,random,Random Pool Track 0971,Pool Artist 071,96791,2026-09-30T08:16:55.491000,192
+44,random,Random Pool Track 1461,Pool Artist 261,193081,2026-09-30T08:14:30.700000,48
+45,random,Random Pool Track 0020,Pool Artist 020,213420,2026-09-30T08:08:18.619000,179
+46,random,Random Pool Track 1740,Pool Artist 240,137540,2026-09-30T08:04:12.199000,33
+47,random,Random Pool Track 1169,Pool Artist 269,74149,2026-09-30T07:35:21.659000,1593
+48,random,Random Pool Track 0695,Pool Artist 095,112595,2026-09-30T07:24:09.510000,598
+49,random,Random Pool Track 1002,Pool Artist 102,292842,2026-09-30T07:09:41.915000,755
+50,random,Random Pool Track 1716,Pool Artist 216,195436,2026-09-30T07:04:30.073000,19
