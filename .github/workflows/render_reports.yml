@@ -1,9 +1,12 @@
 {
   "name": "Render Spotify Reports",
   "on": {
+    "workflow_dispatch": {},
     "repository_dispatch": {
       "types": [
-        "render_real_test"
+        "render_real_test",
+        "render_scheduled",
+        "render_manual_test"
       ]
     }
   },
@@ -11,8 +14,8 @@
     "contents": "read"
   },
   "jobs": {
-    "real-render-test": {
-      "name": "Real Spotify payload render test",
+    "renderer-test": {
+      "name": "Chromium headless 50-row test",
       "runs-on": "ubuntu-latest",
       "timeout-minutes": 15,
       "steps": [
@@ -28,41 +31,33 @@
           }
         },
         {
-          "name": "Install Linux dependencies for WeasyPrint",
-          "run": "sudo apt-get update\nsudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 libfontconfig1 libffi-dev libjpeg-dev libopenjp2-7-dev shared-mime-info fonts-dejavu"
-        },
-        {
           "name": "Install Python packages",
-          "run": "python -m pip install --upgrade pip\npython -m pip install weasyprint==70.0 pymupdf==1.28.2 pillow"
+          "run": "python -m pip install --upgrade pip\npython -m pip install -r renderer/requirements.txt"
         },
         {
-          "name": "Verify renderer libraries",
-          "run": "python -c \"import weasyprint, pymupdf, PIL; print('WeasyPrint:', weasyprint.__version__); print('PyMuPDF:', pymupdf.__doc__.splitlines()[0]); print('Pillow:', PIL.__version__)\""
+          "name": "Install Chromium",
+          "run": "python -m playwright install --with-deps --no-shell chromium"
         },
         {
           "name": "Prepare payload",
           "env": {
             "PAYLOAD_JSON": "${{ toJson(github.event.client_payload) }}"
           },
-          "run": "python - <<'PY'\nimport os\nfrom pathlib import Path\nraw = os.environ.get('PAYLOAD_JSON', '').strip()\nif not raw:\n    raise SystemExit('No client_payload received. Use Apps Script repository_dispatch for this test.')\nPath('payload.json').write_text(raw, encoding='utf-8')\nprint('Payload bytes:', len(raw.encode('utf-8')))\nPY"
+          "run": "if [ \"${{ github.event_name }}\" = \"repository_dispatch\" ]; then\n  printf '%s' \"$PAYLOAD_JSON\" > payload.json\nelse\n  python renderer/create_fixture.py\n  mv fixture_payload.json payload.json\nfi\npython -m json.tool payload.json >/dev/null\npython - <<'PY'\nimport json\np=json.load(open('payload.json',encoding='utf-8'))\nprint('payload type:', p.get('type'))\nprint('official tracks:', len(p.get('playlistXTracks', [])))\nprint('random pool/filler tracks:', len(p.get('fillerTracks', [])))\nPY"
         },
         {
-          "name": "Check payload",
-          "run": "python -c \"import json; p=json.load(open('payload.json', encoding='utf-8')); print('type=', p.get('type')); print('playlist=', p.get('playlistName')); print('recordId=', p.get('recordId')); print('X tracks=', len(p.get('playlistXTracks', []))); print('filler=', len(p.get('fillerTracks', []))); assert p.get('type')=='real_render_test'; assert p.get('recordId'); assert p.get('playlistUrl'); assert p.get('referenceTime'); assert p.get('playlistXTracks') is not None; assert p.get('fillerTracks') is not None\""
+          "name": "Run Chromium renderer",
+          "run": "rm -rf artifacts/real_render_test\npython renderer/renderer_chromium.py payload.json --template renderer/templates/report_template.html --outdir artifacts/real_render_test"
         },
         {
-          "name": "Run real renderer",
-          "run": "rm -rf artifacts/real_render_test\npython renderer/renderer_live.py payload.json --template renderer/templates/report_template.html --outdir artifacts/real_render_test"
+          "name": "Validate artifacts",
+          "run": "python - <<'PY'\nimport csv, json\nfrom pathlib import Path\nfrom PIL import Image\nout=Path('artifacts/real_render_test')\nmanifest=json.loads((out/'manifest.json').read_text(encoding='utf-8'))\nimg=Image.open(out/'report_real.png')\nassert img.size==(1445,2047), img.size\nwith (out/'history_real.csv').open(encoding='utf-8') as f:\n    rows=list(csv.DictReader(f))\nassert len(rows)==50, len(rows)\noff=[r for r in rows if r['origen']=='playlist_x']\nran=[r for r in rows if r['origen']=='random']\nassert len(off)==30, len(off)\nassert len(ran)==20, len(ran)\nassert all(int(r['gap_s'])==0 for r in off)\nassert max(int(r['gap_s']) for r in ran)>120\nprint('CHROMIUM VALIDATION OK')\nprint('PNG:', img.size)\nprint('Rows:', len(rows))\nprint('Official:', len(off))\nprint('Random:', len(ran))\nprint('Random max gap:', max(int(r['gap_s']) for r in ran), 'seconds')\nPY"
         },
         {
-          "name": "Validate real output",
-          "run": "python -c \"import csv, json; from pathlib import Path; from PIL import Image; import pymupdf; out=Path('artifacts/real_render_test'); m=json.loads((out/'manifest.json').read_text(encoding='utf-8')); img=Image.open(out/'report_real.png'); doc=pymupdf.open(out/'report_real.pdf'); rows=list(csv.DictReader((out/'history_real.csv').open(encoding='utf-8'))); print('manifest=', json.dumps(m, ensure_ascii=False)); print('PNG=', img.size); print('PDF pages=', len(doc)); print('Rows=', len(rows)); print('Playlist X=', sum(r['origen']=='playlist_x' for r in rows)); print('Random=', sum(r['origen']=='random' for r in rows)); assert img.size==(2400,3400); assert len(doc)==1; assert len(rows)==50; assert sum(r['origen']=='playlist_x' for r in rows)==m['playlistXInputRows'] if m['playlistXInputRows']<=50 else 50; assert sum(r['origen']=='random' for r in rows)==50-min(m['playlistXInputRows'],50); print('REAL OUTPUT VALIDATION OK')\""
-        },
-        {
-          "name": "Upload real test artifacts",
+          "name": "Upload test artifacts",
           "uses": "actions/upload-artifact@v7",
           "with": {
-            "name": "real-render-test",
+            "name": "chromium-render-test",
             "path": "artifacts/real_render_test",
             "if-no-files-found": "error",
             "retention-days": 7
