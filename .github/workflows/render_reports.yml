@@ -1,5 +1,5 @@
 {
-  "name": "Spotify report renderer - V16 X-only 3 parts",
+  "name": "Spotify report renderer - V17 X-only dynamic mobile parts",
   "on": {
     "workflow_dispatch": {},
     "repository_dispatch": {
@@ -15,7 +15,7 @@
   },
   "jobs": {
     "renderer-test": {
-      "name": "Chromium headless - X only - 3 mobile parts",
+      "name": "Chromium headless - X only - dynamic mobile parts",
       "runs-on": "ubuntu-latest",
       "timeout-minutes": 15,
       "steps": [
@@ -42,8 +42,8 @@
           "id": "playwright-cache",
           "with": {
             "path": "~/.cache/ms-playwright",
-            "key": "${{ runner.os }}-playwright-chromium-v15-${{ hashFiles('renderer/requirements.txt') }}",
-            "restore-keys": "${{ runner.os }}-playwright-chromium-v15-"
+            "key": "${{ runner.os }}-playwright-chromium-v17-${{ hashFiles('renderer/requirements.txt') }}",
+            "restore-keys": "${{ runner.os }}-playwright-chromium-v17-"
           }
         },
         {
@@ -60,21 +60,21 @@
           "env": {
             "PAYLOAD_JSON": "${{ toJson(github.event.client_payload) }}"
           },
-          "run": "if [ \"${{ github.event_name }}\" = \"repository_dispatch\" ]; then\n  printf '%s' \"$PAYLOAD_JSON\" > payload.json\nelse\n  cp fixture_payload.json payload.json\nfi\n\npython -m json.tool payload.json >/dev/null\n\npython - <<'PY2'\nimport json\nfrom pathlib import Path\n\npath = Path('payload.json')\np = json.loads(path.read_text(encoding='utf-8'))\noriginal_type = p.get('type', '')\nif original_type == 'scheduled_render':\n    p['type'] = 'real_render_test'\n\n# V16 es estrictamente X-only. No se acepta relleno/random.\nfiller = p.get('fillerTracks') or []\nif filler:\n    raise SystemExit(f'V16 rejects fillerTracks: received {len(filler)} random tracks')\n\nx = p.get('playlistXTracks') or []\nif not x:\n    raise SystemExit('V16 requires playlistXTracks')\n\npath.write_text(json.dumps(p, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')\nprint('original payload type:', original_type)\nprint('renderer payload type:', p.get('type'))\nprint('generationMode:', p.get('generationMode', ''))\nprint('Playlist X tracks:', len(x))\nprint('Random tracks:', 0)\nprint('referenceTime:', p.get('referenceTime', ''))\nPY2"
+          "run": "if [ \"${{ github.event_name }}\" = \"repository_dispatch\" ]; then\n  printf '%s' \"$PAYLOAD_JSON\" > payload.json\nelse\n  cp fixture_payload.json payload.json\nfi\n\npython -m json.tool payload.json >/dev/null\n\npython - <<'PY2'\nimport json\nfrom pathlib import Path\n\npath = Path('payload.json')\np = json.loads(path.read_text(encoding='utf-8'))\noriginal_type = p.get('type', '')\nif original_type == 'scheduled_render':\n    p['type'] = 'real_render_test'\n\n# V17 es estrictamente X-only. No se acepta relleno/random.\nfiller = p.get('fillerTracks') or []\nif filler:\n    raise SystemExit(f'V17 rejects fillerTracks: received {len(filler)} random tracks')\n\nx = p.get('playlistXTracks') or []\nif not x:\n    raise SystemExit('V17 requires playlistXTracks')\n\npath.write_text(json.dumps(p, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')\nprint('original payload type:', original_type)\nprint('renderer payload type:', p.get('type'))\nprint('generationMode:', p.get('generationMode', ''))\nprint('Playlist X tracks:', len(x))\nprint('Random tracks:', 0)\nprint('referenceTime:', p.get('referenceTime', ''))\nPY2"
         },
         {
           "name": "Run Chromium renderer",
           "run": "rm -rf artifacts/real_render_test\npython renderer/renderer_chromium.py payload.json --template renderer/templates/report_template.html --outdir artifacts/real_render_test"
         },
         {
-          "name": "Validate V16 output",
-          "run": "python - <<'PY3'\nimport csv\nimport json\nfrom pathlib import Path\nfrom PIL import Image, ImageChops\n\nout = Path('artifacts/real_render_test')\npayload = json.loads(Path('payload.json').read_text(encoding='utf-8'))\nmanifest = json.loads((out / 'manifest.json').read_text(encoding='utf-8'))\n\nx_input = len(payload.get('playlistXTracks', []))\nassert x_input > 0\nassert not (payload.get('fillerTracks') or [])\n\nmaster = Image.open(out / 'report_real.png').convert('RGB')\nassert master.size == (1080, 5760), f'Unexpected master size: {master.size}'\n\nparts = sorted(out.glob('report_part_*.png'))\nassert len(parts) == 3, f'Expected 3 parts, found {len(parts)}'\nfor i, p in enumerate(parts, 1):\n    img = Image.open(p).convert('RGB')\n    assert img.size == (1080, 1920), f'Part {i}: {img.size}'\n    bbox = ImageChops.difference(img, Image.new('RGB', img.size, 'white')).getbbox()\n    assert bbox is not None, f'Part {i} is completely white'\n\nwith (out / 'history_real.csv').open(encoding='utf-8', newline='') as f:\n    rows = list(csv.DictReader(f))\n\nassert len(rows) == x_input, f'CSV rows {len(rows)} != X {x_input}'\nassert all(r['origen'] == 'playlist_x' for r in rows)\nassert all(int(r['gap_s']) == 0 for r in rows)\nassert all(r.get('image_url', '') for r in rows), 'Some X rows are missing individual artwork URL'\n\nassert manifest['parts'] == 3\nassert manifest['partSize'] == [1080, 1920]\nassert manifest['randomRowsUsed'] == 0\nassert manifest['officialRowsUsed'] == x_input\n\nprint('========================================')\nprint('V16 VALIDATION OK')\nprint('========================================')\nprint('Master:', master.size)\nprint('Parts:', [Image.open(p).size for p in parts])\nprint('X rows:', x_input)\nprint('Artwork URLs:', sum(1 for r in rows if r.get('image_url')))\nprint('Part row counts:', manifest.get('partRowCounts'))\nprint('========================================')\nPY3"
+          "name": "Validate V17 output",
+          "run": "python - <<'PY3'\nimport csv\nimport json\nfrom pathlib import Path\nfrom PIL import Image, ImageChops\n\nout = Path('artifacts/real_render_test')\npayload = json.loads(Path('payload.json').read_text(encoding='utf-8'))\nmanifest = json.loads((out / 'manifest.json').read_text(encoding='utf-8'))\n\nx_input = len(payload.get('playlistXTracks', []))\nassert x_input > 0\nassert not (payload.get('fillerTracks') or [])\n\nmaster = Image.open(out / 'report_real.png').convert('RGB')\nassert master.size[0] == 1080, f'Unexpected master width: {master.size}'\n\nparts = sorted(out.glob('report_part_*.png'))\nexpected_parts = (x_input + 18 - 1) // 18\nassert len(parts) == expected_parts, f'Expected {expected_parts} parts for {x_input} X tracks, found {len(parts)}'\n\nfor i, p in enumerate(parts, 1):\n    img = Image.open(p).convert('RGB')\n    assert img.size[0] == 1080, f'Part {i}: unexpected width {img.size}'\n    if i < len(parts):\n        assert img.size[1] == 1920, f'Part {i}: {img.size} is not a full phone screenshot'\n    else:\n        assert 1 <= img.size[1] <= 1920, f'Last part {i}: invalid height {img.size}'\n    bbox = ImageChops.difference(img, Image.new('RGB', img.size, 'white')).getbbox()\n    assert bbox is not None, f'Part {i} is completely white'\n\nwith (out / 'history_real.csv').open(encoding='utf-8', newline='') as f:\n    rows = list(csv.DictReader(f))\n\nassert len(rows) == x_input, f'CSV rows {len(rows)} != X {x_input}'\nassert all(r['origen'] == 'playlist_x' for r in rows)\nassert all(int(r['gap_s']) == 0 for r in rows)\nassert all(r.get('image_url', '') for r in rows), 'Some X rows are missing individual artwork URL'\n\nassert manifest['parts'] == expected_parts\nassert manifest['partSize'] == [1080, 1920]\nassert manifest['partHeights'] == [Image.open(p).size[1] for p in parts]\nassert master.size[1] == sum(manifest['partHeights']), f'Master height {master.size[1]} does not equal sum of parts'\nassert manifest['randomRowsUsed'] == 0\nassert manifest['officialRowsUsed'] == x_input\n\nprint('========================================')\nprint('V17 VALIDATION OK')\nprint('========================================')\nprint('Master:', master.size)\nprint('Parts:', [Image.open(p).size for p in parts])\nprint('X rows:', x_input)\nprint('Artwork URLs:', sum(1 for r in rows if r.get('image_url')))\nprint('Part row counts:', manifest.get('partRowCounts'))\nprint('========================================')\nPY3"
         },
         {
           "name": "Upload test artifacts",
           "uses": "actions/upload-artifact@v7",
           "with": {
-            "name": "chromium-v15-x-only-3-parts",
+            "name": "chromium-v17-x-only-dynamic-parts",
             "path": "artifacts/real_render_test",
             "if-no-files-found": "error",
             "retention-days": 7
