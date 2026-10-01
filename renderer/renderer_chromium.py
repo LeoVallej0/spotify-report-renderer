@@ -41,11 +41,12 @@ def normalize_track(track: dict[str, Any], origin: str) -> dict[str, Any]:
     if duration_ms <= 0:
         raise ValueError(f'Invalid duration for track: {name}')
 
+    # IMPORTANTE: imageUrl/image_url deben pertenecer al track.
+    # Nunca usar coverUrl/cover_url aquí: esos campos pueden ser la portada
+    # de la playlist y producirían la misma imagen en todas las filas.
     image_url = str(
         track.get('imageUrl')
         or track.get('image_url')
-        or track.get('coverUrl')
-        or track.get('cover_url')
         or ''
     ).strip()
 
