@@ -22,8 +22,6 @@ PART_HEIGHT = VIEWPORT_HEIGHT * DEVICE_SCALE_FACTOR
 # Las capturas usan un viewport móvil fijo. Cada pantalla completa tiene 1920 px
 # de alto de salida (1080x1920); solo la última parte se recorta al final real
 # de la última canción cuando no llena una pantalla completa.
-# Esta es la capacidad de referencia del layout actual; la cantidad total de
-# partes es dinámica según el número de canciones de Playlist X.
 MAX_ROWS_PER_PART = 18
 LAST_PART_BOTTOM_PADDING_CSS = 8
 
@@ -165,14 +163,24 @@ def balanced_slices(count: int) -> list[tuple[int, int]]:
     if count <= 0:
         return []
 
-    # La capacidad está basada en la altura real del layout móvil V16.
-    # No se modifica el conjunto X: solo se decide dónde empieza cada captura.
-    part_count = (count + MAX_ROWS_PER_PART - 1) // MAX_ROWS_PER_PART
+    # Conservamos el límite habitual de 18 filas por pantalla. Si el sobrante
+    # final es de 1 a 3 canciones, lo incorporamos al bloque anterior; esa
+    # última captura será algo más alta, evitando una imagen casi vacía.
     slices: list[tuple[int, int]] = []
-    for index in range(part_count):
-        start_idx = index * MAX_ROWS_PER_PART
+    start_idx = 0
+    while start_idx < count:
         end_idx = min(count, start_idx + MAX_ROWS_PER_PART)
         slices.append((start_idx, end_idx))
+        start_idx = end_idx
+
+    if len(slices) > 1:
+        tail_count = slices[-1][1] - slices[-1][0]
+        if 1 <= tail_count <= 3:
+            previous_start = slices[-2][0]
+            final_end = slices[-1][1]
+            slices[-2] = (previous_start, final_end)
+            slices.pop()
+
     return slices
 
 
@@ -206,9 +214,11 @@ def render_parts(
     html_parts: list[str],
     rows_per_part: list[int],
     outdir: Path,
+    row_ranges: list[tuple[int, int]],
 ) -> dict[str, Any]:
     part_paths: list[Path] = []
     part_heights: list[int] = []
+    part_manifest: list[dict[str, Any]] = []
 
     with sync_playwright() as playwright:
         browser = launch_browser(playwright)
@@ -224,38 +234,30 @@ def render_parts(
                     wait_for_images(page)
 
                     is_last = index == total_parts
-                    is_full_last = rows_per_part[index - 1] >= MAX_ROWS_PER_PART
-                    path = outdir / f'report_part_{index}.png'
+                    count_in_part = rows_per_part[index - 1]
+                    start_row, end_row = row_ranges[index - 1]
+                    file_name = 'report_real.png' if index == 1 else f'report_real_part_{index:02d}.png'
+                    path = outdir / file_name
 
-                    if is_last and not is_full_last:
-                        # La última captura termina exactamente después de la última
-                        # fila, con un pequeño margen natural. Nunca cambia el ancho
-                        # ni la geometría de las pantallas anteriores.
-                        bottom_css = page.locator('#tracks-list').evaluate(
+                    if is_last and count_in_part != MAX_ROWS_PER_PART:
+                        bottom_css = float(page.locator('#tracks-list').evaluate(
                             "el => Math.ceil(el.getBoundingClientRect().bottom)"
-                        )
-                        crop_css_height = min(
-                            VIEWPORT_HEIGHT,
-                            max(1, int(bottom_css + LAST_PART_BOTTOM_PADDING_CSS))
-                        )
+                        ))
+                        content_height = max(1, int(bottom_css + LAST_PART_BOTTOM_PADDING_CSS))
+                        # Ordinary short tails are cropped to content. A merged
+                        # tail (19-21 rows) gets a taller viewport so no song is cut.
+                        capture_css_height = max(VIEWPORT_HEIGHT, content_height) if count_in_part > MAX_ROWS_PER_PART else min(VIEWPORT_HEIGHT, content_height)
+                        if capture_css_height > VIEWPORT_HEIGHT:
+                            page.set_viewport_size({'width': VIEWPORT_WIDTH, 'height': capture_css_height})
                         page.screenshot(
                             path=str(path),
                             full_page=False,
-                            clip={
-                                'x': 0,
-                                'y': 0,
-                                'width': VIEWPORT_WIDTH,
-                                'height': crop_css_height,
-                            },
+                            clip={'x': 0, 'y': 0, 'width': VIEWPORT_WIDTH, 'height': capture_css_height},
                             scale='device',
                         )
-                        expected_height = crop_css_height * DEVICE_SCALE_FACTOR
+                        expected_height = capture_css_height * DEVICE_SCALE_FACTOR
                     else:
-                        page.screenshot(
-                            path=str(path),
-                            full_page=False,
-                            scale='device',
-                        )
+                        page.screenshot(path=str(path), full_page=False, scale='device')
                         expected_height = PART_HEIGHT
 
                     img = Image.open(path).convert('RGB')
@@ -265,31 +267,31 @@ def render_parts(
                         )
                     part_paths.append(path)
                     part_heights.append(img.height)
+                    part_manifest.append({
+                        'partNumber': index,
+                        'fileName': file_name,
+                        'width': img.width,
+                        'height': img.height,
+                        'startRow': start_row,
+                        'endRow': end_row,
+                        'rowCount': count_in_part,
+                        'isFinalPart': is_last,
+                    })
                 finally:
                     page.close()
         finally:
             browser.close()
 
-    master_height = sum(part_heights)
-    canvas = Image.new('RGB', (OUTPUT_WIDTH, master_height), 'white')
-    y = 0
-    for path, part_height in zip(part_paths, part_heights):
-        img = Image.open(path).convert('RGB')
-        canvas.paste(img, (0, y))
-        y += part_height
-
-    master_path = outdir / 'report_real.png'
-    canvas.save(master_path, format='PNG', optimize=True)
-
     return {
-        'width': canvas.width,
-        'height': canvas.height,
+        'width': OUTPUT_WIDTH,
+        'height': sum(part_heights),
         'part_width': OUTPUT_WIDTH,
         'part_full_height': PART_HEIGHT,
         'part_heights': part_heights,
-        'parts': total_parts,
-        'master_bytes': master_path.stat().st_size,
-        'part_files': [str(p.name) for p in part_paths],
+        'parts': part_manifest,
+        'parts_count': len(part_manifest),
+        'part_files': [p.name for p in part_paths],
+        'bytes_total': sum(p.stat().st_size for p in part_paths),
     }
 
 
@@ -369,12 +371,12 @@ def main() -> None:
     write_csv(rows, csv_path)
 
     image_count = sum(1 for r in rows if r.get('image_url'))
-    render_result = render_parts(html_parts, used_rows_for_part, outdir)
+    render_result = render_parts(html_parts, used_rows_for_part, outdir, [(start + 1, end) for start, end in slices])
     validation = validate(rows, len(x_tracks), image_count)
 
     manifest = {
         'renderer': 'chromium-headless',
-        'formatVersion': 'V17_X_ONLY_TRACK_COVERS_DYNAMIC_MOBILE',
+        'formatVersion': 'V16_X_ONLY_TRACK_COVERS_DYNAMIC_MOBILE',
         'type': payload.get('type'),
         'recordId': payload.get('recordId', ''),
         'playlistName': payload.get('playlistName', ''),
@@ -390,13 +392,23 @@ def main() -> None:
         'parts': render_result['parts'],
         'partRowCounts': used_rows_for_part,
         'partMaxRows': MAX_ROWS_PER_PART,
+        'tailMergeMaxRows': 3,
         'partHeights': render_result['part_heights'],
         'render': render_result,
         'validation': validation,
+        'contract': {
+            'xOnly': True,
+            'preserveXLength': True,
+            'individualTrackCoversRequired': True,
+            'fillerAllowed': False,
+            'fixedMasterHeightRequired': False,
+            'fixedPartCount': False,
+            'mergeTailUpToRows': 3,
+        },
     }
     (outdir / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
-    print('CHROMIUM V17 X-ONLY TRACK COVERS DYNAMIC-PART RENDER OK')
+    print('CHROMIUM V16 X-ONLY TRACK COVERS DYNAMIC-PART RENDER OK')
 
 
 if __name__ == '__main__':
